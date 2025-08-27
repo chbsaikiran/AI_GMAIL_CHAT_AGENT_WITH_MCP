@@ -202,8 +202,8 @@ async def chat_with_gmail(user_input: UserQuery):
                     print(f"DEBUG: Calling tool {func_name}")
                     
                     result = await session.call_tool(func_name, arguments=arguments)
-                    print(f"DEBUG: Raw result: {result}")
-                    summarized_email = Replace_total_expenses_from_emails_with_query(summarized_email,result)
+                    print(f"DEBUG: Raw result: {result.content[0].text}")
+                    summarized_email = Replace_total_expenses_from_emails_with_query(summarized_email,result.content[0].text)
 
                 except Exception as e:
                     print(f"DEBUG: Error details: {str(e)}")

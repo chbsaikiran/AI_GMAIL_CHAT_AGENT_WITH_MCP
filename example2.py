@@ -25,7 +25,7 @@ def add(a: int, b: int) -> int:
     return int(a + b)
 
 @mcp.tool()
-def add_list(l: list) -> int:
+def add_list(l: list) -> float:
     """Add all numbers in a list"""
     print("CALLED: add(l: list) -> int:")
     return sum(l)
