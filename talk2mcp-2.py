@@ -161,6 +161,10 @@ async def chat_with_gmail(user_input: UserQuery):
                 print(f"DEBUG: Function name: {func_name}")
                 print(f"DEBUG: Raw parameters: {params}")
                 
+                if func_name == "add_list" and params == ['0']:
+                    print("No expenses found in the summary.")
+                    summarized_email = Replace_total_expenses_from_emails_with_query(summarized_email,"No relevant information found in the emails.")
+                    return {"answer": summarized_email}
                 try:
                     # Find the matching tool to get its input schema
                     tool = next((t for t in tools if t.name == func_name), None)

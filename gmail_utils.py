@@ -45,6 +45,7 @@ def fetch_emails_from_query(query: str, max_results=50):
             full_snippet = f"Date: {date}\nSubject: {subject}\nContent: {snippet}"
             snippets.append(full_snippet)
         
+        print(f"Fetched {snippets} emails for query: {query}")
         return snippets
     except Exception as e:
         print(f"Error fetching emails: {str(e)}")

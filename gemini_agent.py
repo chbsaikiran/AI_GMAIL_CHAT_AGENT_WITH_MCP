@@ -1,6 +1,7 @@
 import os
 import google.generativeai as genai
 from dotenv import load_dotenv
+from datetime import date, timedelta
 
 # Load environment variables from .env file
 load_dotenv()
@@ -11,6 +12,17 @@ api_key = os.getenv("GEMINI_API_KEY")
 genai.configure(api_key=api_key)
 
 def build_gmail_search_query(natural_question: str) -> str:
+    today = date.today()
+    year = today.year
+    month = today.month
+    day = today.day
+
+    # Also useful to precompute yesterday, last_week etc. for examples
+    yesterday = today - timedelta(days=1)
+    last_week = today - timedelta(days=7)
+    last_month = today - timedelta(days=30)
+    last_ten_years = today - timedelta(days=3650)
+
     model = genai.GenerativeModel("gemini-2.0-flash")
     system_prompt = f"""
 You are an AI expert at writing Gmail search queries.
@@ -18,15 +30,33 @@ Convert the following user question into a Gmail search query syntax.
 Only output the Gmail query string. Do not explain anything.
 
 IMPORTANT RULES:
-1. For "this month" queries in May 2025, ALWAYS use exactly:
-   after:2025/05/01 before:2025/05/31
-2. Include the ENTIRE day in date ranges
-3. Never skip any days in the range
+1. Include the all days in date ranges
+2. Never skip any days in the range
+3. You have pick the keywords from the User Query and use them in the return query which you output
+4. Always use after: and before: for date ranges
+
+Today's date is {today} (Year={year}, Month={month}, Day={day}).
+Yesterday is {yesterday}.
+One week ago was {last_week}.
 
 Examples:
-"Swiggy orders this month" -> "Swiggy after:2025/05/01 before:2025/05/31"
-"IRCTC last week" -> "IRCTC after:2025/05/10 before:2025/05/17"
-"OTP from SBI yesterday" -> "OTP SBI after:2025/05/17 before:2025/05/18"
+if user asks "Zomato orders this year" return:
+"Zomato after:{year}/01/01 and before:{today}"
+
+if user asks "IRCTC last week" return:
+"IRCTC after:{last_week} and before:{today}"
+
+if user asks "where did I travel using Redbus in last one month" return:
+"Redbus after:{last_month} and before:{today}"
+
+if user asks "OTP from SBI yesterday" return:
+"OTP SBI after:{yesterday} and before:{today}"
+
+For queries where the date is not mentioned search the mails for last 10 years i.e. if user asks "when did I buy Atomic Habits by James Clear on Amazon" return:
+"Atomic Habits James Clear Amazon after:{last_ten_years} and before:{today}"
+
+For queries where the date is not mentioned search the mails for last 10 years i.e. if user asks "when did I buy Samsung Mobile on Flipkart" return:
+"Samsung Flipkart after:{last_ten_years} and before:{today}"
 
 User Query:
 {natural_question}
@@ -43,28 +73,27 @@ Your task is to:
 1. Understand the specific question being asked
 2. Analyze the email snippets to find relevant information
 3. Provide a clear, concise answer that directly addresses the user's query
-4. When analyzing expenses or orders:
-   - Include ALL transactions from the entire date range
-   - List each transaction with its date, restaurant, item ordered and amount
+4. When analyzing expenses or orders on online shopping platforms like Amazon, Flipkart, etc:
+   - Include ALL transactions from the entire date range, but only show each transaction with its date, item purchased and amount spent on that particular order
+   - Maintain chronological order
+5. When analyzing expenses or orders on online food delivery platforms like Zomato, Swiggy, etc:
+   - Include ALL transactions from the entire date range, but only show each transaction with its date, restaurant name, item ordered and amount spent on that particuar order
+   - Maintain chronological order
    - Don't Calculate the total amount leave it as Total Amount Spent is : TO BE ADDED LATER, I will later replace the "TO BE ADDED LATER" with correct total amount later.
-5. If the query is about travel or other topics:
+6. If the query is about travel or bookings:
    - Focus on the specific information requested
-   - Provide relevant details from the emails like date, location and amount spent for the travel.
-   - Maintain chronological order when relevant
+   - Provide relevant details from the emails like date, location and amount spent on ticket in the case of travel or amount spent on booking in case of bookings.
+   - Maintain chronological order
    - Don't Calculate the Total amount leave it as "Total Amount Spent is : TO BE ADDED LATER", I will later replace the "TO BE ADDED LATER" with correct total amount.
-
+7.  If the query is about expenses or orders:
+   -  Don't Calculate the Total amount leave it as "Total Amount Spent is : TO BE ADDED LATER", I will later replace the "TO BE ADDED LATER" with correct total amount.
+8. If any other user query Answer the question based on the email snippets, focusing specifically on what was asked.
+9. If there are no relevant emails, respond with "No relevant information found in the emails."
 EMAIL SNIPPETS:
 {combined_emails}
 
 USER QUESTION:
 {user_query}
-
-TASK: 
-1. Answer the question based on the email snippets, focusing specifically on what was asked.
-2. When analyzing expenses or orders: Answer the question based on ALL emails in the snippets. For expenses/orders:
-  - List each transaction with its date
-  - Show the total amount
-  - Include all orders in the date range
 """
     response = model.generate_content(final_prompt)
     return response.text
@@ -72,7 +101,7 @@ TASK:
 def get_total_expenses_from_emails_with_query(summarized_answer: str) -> str:
     model = genai.GenerativeModel("gemini-2.0-flash")
     final_prompt = f"""
-You are an assistant who analyzes summarized answer to a gmail query, and sees if there are expenses in the summarized answer if the answer is yes then:
+You are an assistant who analyzes summarized answer to a gmail query, and sees if there are expenses or amount spent in the summarized answer if the answer is yes then:
 From ALL these transactions, just give all expenses separated by | and with prefix FUNCTION_CALL: add_list . Don't give any other output, only the expenses separated by | and with prefix FUNCTION_CALL: add_list .
 if the summary has amounts like this below(the actual data may look different) but your task is to separate out the amounts for each transaction.
     Eg: Zomato order of amount on 29th March 2025 is Rs 250.50
@@ -91,7 +120,7 @@ def Replace_total_expenses_from_emails_with_query(summarized_answer: str, Total_
     model = genai.GenerativeModel("gemini-2.0-flash")
     final_prompt = f"""
 You are an assistant who analyzes summarized answer to a gmail query, and your job is to fill in the text "Total Amount Spent is : TO BE ADDED LATER" in the place of TO BE ADDED LATER put {Total_Expenses}, remaining all text remains the same, don't change anything else.
-Eg: if the input looks like this(actual may differ) but your tsk is to only replace TO BE ADDED LATER with {Total_Expenses}
+Eg: if the input looks like this(actual may differ) but your task is to only replace TO BE ADDED LATER with {Total_Expenses}
     Zomato order amount on 29th March 2025 is Rs 250.50
     Zomato order amount on 7th April 2025 is Rs 260.50
     Zomato order amount on 9th May 2025 is Rs 1500.60
