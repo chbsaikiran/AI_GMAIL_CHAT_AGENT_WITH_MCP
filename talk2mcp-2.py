@@ -180,7 +180,7 @@ async def chat_with_gmail(user_input: UserQuery):
                         if not params:  # Check if we have enough parameters
                             raise ValueError(f"Not enough parameters provided for {func_name}")
                             
-                        value = params.pop(0)  # Get and remove the first parameter
+                        value = params  # Get and remove the first parameter
                         param_type = param_info.get('type', 'string')
                         
                         print(f"DEBUG: Converting parameter {param_name} with value {value} to type {param_type}")

@@ -45,11 +45,11 @@ Your task is to:
 3. Provide a clear, concise answer that directly addresses the user's query
 4. When analyzing expenses or orders:
    - Include ALL transactions from the entire date range
-   - List each transaction with its date
+   - List each transaction with its date, restaurant, item ordered and amount
    - Don't Calculate the total amount leave it as Total Amount Spent is : TO BE ADDED LATER, I will later replace the "TO BE ADDED LATER" with correct total amount later.
 5. If the query is about travel or other topics:
    - Focus on the specific information requested
-   - Provide relevant details from the emails
+   - Provide relevant details from the emails like date, location and amount spent for the travel.
    - Maintain chronological order when relevant
    - Don't Calculate the Total amount leave it as "Total Amount Spent is : TO BE ADDED LATER", I will later replace the "TO BE ADDED LATER" with correct total amount.
 
@@ -75,9 +75,9 @@ def get_total_expenses_from_emails_with_query(summarized_answer: str) -> str:
 You are an assistant who analyzes summarized answer to a gmail query, and sees if there are expenses in the summarized answer if the answer is yes then:
 From ALL these transactions, just give all expenses separated by | and with prefix FUNCTION_CALL: add_list . Don't give any other output, only the expenses separated by | and with prefix FUNCTION_CALL: add_list .
 if the summary has amounts like this below(the actual data may look different) but your task is to separate out the amounts for each transaction.
-    Eg: Zomato order amount on 29th March 2025 is Rs 250.50
-    Zomato order amount on 7th April 2025 is Rs 260.50
-    Zomato order amount on 9th May 2025 is Rs 1500.60
+    Eg: Zomato order of amount on 29th March 2025 is Rs 250.50
+    Zomato order of amount on 7th April 2025 is Rs 260.50
+    Zomato order of amount on 9th May 2025 is Rs 1500.60
     Then you should give result as "FUNCTION_CALL: add_list|250.50|260.50|1500.60" without quotes and nothing else needs to be output
     if they are no expenses in the summary then just output "FUNCTION_CALL: add_list|0" without quotes and nothing else needs to be output
 
