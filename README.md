@@ -81,7 +81,7 @@ GOOGLE_API_KEY=your_api_key_here
 
 1. Start the FastAPI server:
 ```bash
-uvicorn main:app --reload
+python talk2mcp-2.py
 ```
 
 2. Open your web browser and navigate to:
