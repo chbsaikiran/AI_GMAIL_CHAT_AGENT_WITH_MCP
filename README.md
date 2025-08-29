@@ -93,20 +93,13 @@ http://localhost:8000
 
 1. The chat interface will open with a welcome message
 2. Type your query in natural language, for example:
-   - How much did I spend on Zomato in year 2025??
-   - What did I order most on Zomato in year 2025??
-   - How much did I spent on Swiggy in year 2025??
-   - How much did I spent in Taara Kitchen in May 2025??
-   - where did I travel using Redbus in year 2025??
-   - How much did I spent on SHAIK JABEER in year 2025??
-   - when did I last pay for ChatGPT subscription in year 2025??
-   - when did I last pay for Cursor subscription in year 2025??
-   - when did I buy Apple iphone 13 from Croma??
-   - when did I buy Samsung phone from Flipkart??
-   - when did I buy Redmi Note 5 Pro??
-   - When did I last go to Karachi Bakery??
-   - What meetings were scheduled in year 2025 excluding ERA V3 and EAG V1?
-   - When did I give interviews to Harman??
+   - how much did I spent on zomato this year??
+   - How much did I pay for coursera subscription using axis bank in this year??
+   - How much did I spent in Taara Kitchen using axis bank in this month??
+   - how much did I spent on redbus this year??
+   - how much did I spent for ChatGPT subscription using axis bank in this year??
+   - how much did I spent for Cursor subscription using axis bank in this year??
+   - how much did I spent for Karachi Bakery using axis bank??
 3. Press Enter or click the send button to submit your query
 4. The assistant will process your request and display the results in a chat bubble
 
