@@ -32,8 +32,11 @@ Only output the Gmail query string. Do not explain anything.
 IMPORTANT RULES:
 1. Include the all days in date ranges
 2. Never skip any days in the range
-3. You have pick the keywords from the User Query and use them in the return query which you output
-4. Always use after: and before: for date ranges
+3. You have pick the keywords from the User Query and do spelling corrections, identify the main keyword and put in quotes and return it as output query
+4. If the query is about zomato or swiggy or any food delivery platform, include the keywords "order"and "paid" in the output query
+5. If the query is about travel or bookings, include the keyword "Rs", "ticket" or "booking" in the output query
+7. If the query is about OTP or transactions from banks, include the keyword "OTP"
+8. Always use after: and before: for date ranges
 
 Today's date is {today} (Year={year}, Month={month}, Day={day}).
 Yesterday is {yesterday}.
@@ -41,22 +44,22 @@ One week ago was {last_week}.
 
 Examples:
 if user asks "Zomato orders this year" return:
-"Zomato after:{year}/01/01 and before:{today}"
+'"Zomato" order paid after:{year}/01/01 and before:{today}'
 
 if user asks "IRCTC last week" return:
-"IRCTC after:{last_week} and before:{today}"
+'"IRCTC" Rs ticket booking after:{last_week} and before:{today}'
 
 if user asks "where did I travel using Redbus in last one month" return:
-"Redbus after:{last_month} and before:{today}"
+'"Redbus" Rs ticket booking after:{last_month} and before:{today}'
 
 if user asks "OTP from SBI yesterday" return:
-"OTP SBI after:{yesterday} and before:{today}"
+'OTP "SBI" after:{yesterday} and before:{today}'
 
 For queries where the date is not mentioned search the mails for last 10 years i.e. if user asks "when did I buy Atomic Habits by James Clear on Amazon" return:
-"Atomic Habits James Clear Amazon after:{last_ten_years} and before:{today}"
+'Atomic Habits James Clear "Amazon" after:{last_ten_years} and before:{today}'
 
 For queries where the date is not mentioned search the mails for last 10 years i.e. if user asks "when did I buy Samsung Mobile on Flipkart" return:
-"Samsung Flipkart after:{last_ten_years} and before:{today}"
+'Samsung "Flipkart" Rs paid after:{last_ten_years} and before:{today}'
 
 User Query:
 {natural_question}
