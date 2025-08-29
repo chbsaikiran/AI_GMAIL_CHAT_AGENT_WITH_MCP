@@ -100,6 +100,8 @@ http://localhost:8000
    - how much did I spent for ChatGPT subscription using axis bank in this year??
    - how much did I spent for Cursor subscription using axis bank in this year??
    - how much did I spent for Karachi Bakery using axis bank??
+   - How much did I spent in month of May 2025 using axis bank??
+   You can give any month in the last query even old date like Jan 2017
 3. Press Enter or click the send button to submit your query
 4. The assistant will process your request and display the results in a chat bubble
 
