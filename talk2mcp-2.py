@@ -84,7 +84,7 @@ async def read_root(request: Request):
 @app.post("/chat_with_gmail")
 async def chat_with_gmail(user_input: UserQuery):
     gmail_query = build_gmail_search_query(user_input.query)
-    snippets = fetch_emails_from_query(gmail_query)
+    snippets = fetch_emails_from_query(gmail_query,user_input.query)
     summarized_email = summarize_emails_with_query(user_input.query, snippets)
     list_of_numbers = get_total_expenses_from_emails_with_query(summarized_email)
     reset_state()  # Reset at the start of main

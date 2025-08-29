@@ -32,16 +32,27 @@ Only output the Gmail query string. Do not explain anything.
 IMPORTANT RULES:
 1. Include the all days in date ranges
 2. Never skip any days in the range
-3. You have pick the keywords from the User Query and do spelling corrections, identify the main keyword and put in quotes and return it as output query
-4. If the query is about zomato or swiggy or any food delivery platform, include the keywords "order"and "paid" in the output query
+3. You have pick the keywords from the User Query and do spelling corrections, identify all the main keywords and put them in quotes and return it as output query
+4. If the query is about zomato or swiggy or any food delivery platform, include the keywords "order" and "paid" in the output query
 5. If the query is about travel or bookings, include the keyword "Rs", "ticket" or "booking" in the output query
+6. If the query about shopping or orders from online shopping platforms like Amazon, Flipkart, etc, include the keywords "Rs" and "paid" in the output query
 7. If the query is about OTP or transactions from banks, include the keyword "OTP"
-8. Always use after: and before: for date ranges
+8. If it is specific query then don't add any extra keywords like "Rs", "paid" etc, like if User Query is having keywords like when and where etc
+9. Always use after: and before: for date ranges
 
 Today's date is {today} (Year={year}, Month={month}, Day={day}).
 Yesterday is {yesterday}.
 One week ago was {last_week}.
-
+Examples to identify main keywords
+if user asks "Zomato orders this year" main keyword is "Zomato"
+if user asks "IRCTC last week" main keyword is "IRCTC"
+if user asks "where did I travel using Redbus in last one month" main keyword is "Redbus"
+if user asks "OTP from SBI yesterday" main keyword is "SBI"
+if user asks "which books did I buy on amazon this year??" main keywords are "books" , "amazon"
+if user asks "when did I buy Atomic Habits by James Clear on Amazon" main keywords are "Atomic Habits", "James Clear" , "Amazon"
+if user asks "when did I buy iphone 13 on Croma this year??" main keywords are "iphone 13" "Croma"
+if user asks "when did I buy Samsung Mobile on Flipkart" main keywords are "Samsung" "Flipkart"
+So multiple keywords can be there in the User Query search query and find all the main keywords and put them in quotes and return it as output query, if there any additional keywords to be added based on the rules below add them too
 Examples:
 if user asks "Zomato orders this year" return:
 '"Zomato" order paid after:{year}/01/01 and before:{today}'
@@ -55,11 +66,18 @@ if user asks "where did I travel using Redbus in last one month" return:
 if user asks "OTP from SBI yesterday" return:
 'OTP "SBI" after:{yesterday} and before:{today}'
 
+example with two keywords in User Query "which books did I buy on amazon this year??" return:
+'"books" "amazon" Rs paid after:{year}/01/01 and before:{today}'
+
 For queries where the date is not mentioned search the mails for last 10 years i.e. if user asks "when did I buy Atomic Habits by James Clear on Amazon" return:
-'Atomic Habits James Clear "Amazon" after:{last_ten_years} and before:{today}'
+'"Atomic Habits", "James Clear" "Amazon" after:{last_ten_years} and before:{today}'
+
+Below are examples of how to handle specific user queries:
+when did I buy iphone 13 on Croma this year?? return:
+'"iphone 13" "Croma" after:{year}/01/01 and before:{today}'
 
 For queries where the date is not mentioned search the mails for last 10 years i.e. if user asks "when did I buy Samsung Mobile on Flipkart" return:
-'Samsung "Flipkart" Rs paid after:{last_ten_years} and before:{today}'
+'"Samsung" "Flipkart" Rs paid after:{last_ten_years} and before:{today}'
 
 User Query:
 {natural_question}
@@ -84,6 +102,7 @@ Your task is to:
    - Maintain chronological order
    - Don't Calculate the total amount leave it as Total Amount Spent is : TO BE ADDED LATER, I will later replace the "TO BE ADDED LATER" with correct total amount later.
 6. If the query is about travel or bookings:
+   - if in summary if the ticket was cancelled include that information in the answer that ticket is cancelled mention that ticket cancelled in the answer
    - Focus on the specific information requested
    - Provide relevant details from the emails like date, location and amount spent on ticket in the case of travel or amount spent on booking in case of bookings.
    - Maintain chronological order

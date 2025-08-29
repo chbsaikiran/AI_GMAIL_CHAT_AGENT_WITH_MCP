@@ -7,11 +7,46 @@ import requests
 import base64
 import re
 
+import google.generativeai as genai
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Access your API key and initialize Gemini client correctly
+api_key = os.getenv("GEMINI_API_KEY")
+#client = genai.Client(api_key=api_key)
+genai.configure(api_key=api_key)
+
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/userinfo.profile",
     "https://www.googleapis.com/auth/contacts.readonly"
 ]
+def get_details_from_email_body(email_body,user_query):
+    model = genai.GenerativeModel("gemini-2.0-flash")
+    final_prompt = f"""Your task is to extract the following details from the email body based on the user's query:
+    {user_query}
+1. Amounts: Look for monetary amounts in various formats (e.g., ₹123,
+    Rs. 456, $789.00, etc.) and list them.
+2. Dates: Identify any dates mentioned in the email body in various formats
+    (e.g., DD/MM/YYYY, MM-DD-YYYY, Month Day, Year, etc.) and list them.
+3. Keywords: Extract keywords related to expenses, orders, transactions,
+    bookings, payments, refunds, cancellation etc. List all relevant keywords found in the email body.
+4. Summary: Provide a brief summary of the email content in one or two sentences. and definetely include the information if the ticket was cancelled or not
+5. If the amounts in not in float or integer format then ignore that amount
+6. If no details found then return None for that field
+Only provide the extracted information in a structured format as shown below.
+If any of the details are not found, indicate "None" for that field.
+Format:
+Amounts: [list of amounts or "None"]
+Dates: [list of dates or "None"]
+Keywords: [list of keywords or "None"]
+Summary: [brief summary or "None"]
+Email Body: {email_body}
+Extracted Details:"""
+    response = model.generate_content(final_prompt)
+    return response.text.strip().strip('"')
 
 def authenticate_gmail():
     creds = None
@@ -44,8 +79,8 @@ def get_gmail_profile():
     else:
         raise Exception(f"Error fetching profile: {response.text}")
 
-def fetch_emails_from_query(query: str, max_results=50):
-    output = get_gmail_profile()  # Ensure authentication and get profile
+def fetch_emails_from_query(query: str, user_query: str, max_results=50):
+    #output = get_gmail_profile()  # Ensure authentication and get profile
     service = authenticate_gmail()
     print(f"Fetching emails with query: {query}")
     
@@ -79,14 +114,14 @@ def fetch_emails_from_query(query: str, max_results=50):
                     body += base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
 
             # Regex to find amounts like ₹123, Rs. 456, $789.00 etc.
-            amounts = re.findall(r'(?:₹|Rs\.?|INR|USD|\$)\s?\d+(?:,\d{3})*(?:\.\d{1,2})?', body, re.IGNORECASE)
+            #amounts = re.findall(r'(?:₹|Rs\.?|INR|USD|\$)\s?\d+(?:,\d{3})*(?:\.\d{1,2})?', body, re.IGNORECASE)
+            details = get_details_from_email_body(body,user_query)
 
-            snippet = msg_data.get("snippet", "")
+            snippet = details
             full_snippet = (
                 f"Date: {date}\n"
                 f"Subject: {subject}\n"
                 f"Snippet: {snippet}\n"
-                f"Amounts found: {', '.join(amounts) if amounts else 'None'}"
             )
             snippets.append(full_snippet)
 
