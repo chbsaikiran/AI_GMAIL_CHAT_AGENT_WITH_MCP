@@ -33,7 +33,7 @@ def get_details_from_email_body(email_body,user_query):
     (e.g., DD/MM/YYYY, MM-DD-YYYY, Month Day, Year, etc.) and list them.
 3. Keywords: Extract keywords related to expenses, orders, transactions,
     bookings, payments, refunds, cancellation etc. List all relevant keywords found in the email body.
-4. Summary: Provide a brief summary of the email content in one or two sentences. and definetely include the information if the ticket was cancelled or not
+4. Summary: Provide a brief summary of the email content in one or two sentences. and definetely include the of from where to where the journey happened in case of travel bookings
 5. If the amounts in not in float or integer format then ignore that amount
 6. If no details found then return None for that field
 Only provide the extracted information in a structured format as shown below.
@@ -170,6 +170,7 @@ def fetch_emails_from_query(query: str, user_query: str, max_results=20):
                 break
 
         print(f"✅ Processed {total_checked} emails, kept {total_nonpromo} genuine ones.")
+        #print(collected_snippets)
         return collected_snippets
 
     except Exception as e:

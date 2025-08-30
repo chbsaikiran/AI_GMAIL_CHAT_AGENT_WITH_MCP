@@ -103,6 +103,7 @@ Your task is to:
    - Maintain chronological order
    - Don't Calculate the total amount leave it as Total Amount Spent is : TO BE ADDED LATER, I will later replace the "TO BE ADDED LATER" with correct total amount later.
 6. If the query is about travel or bookings:
+   - Most impotrtant include the journey details like from where to where the journey happened
    - if in summary if the ticket was cancelled include that information in the answer that ticket is cancelled mention that ticket cancelled in the answer
    - Focus on the specific information requested
    - Provide relevant details from the emails like date, location and amount spent on ticket in the case of travel or amount spent on booking in case of bookings.
@@ -120,6 +121,7 @@ USER QUESTION:
 {user_query}
 """
     response = model.generate_content(final_prompt)
+    #print(response.text)
     return response.text
 
 def get_total_expenses_from_emails_with_query(summarized_answer: str) -> str:

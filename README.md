@@ -98,6 +98,7 @@ http://localhost:8000
    - How much did I pay for coursera subscription using axis bank in this year??
    - How much did I spent in Taara Kitchen using axis bank in this month??
    - how much did I spent on redbus this year??
+   - how much money did I get from redbus this year??
    - how much did I spent for ChatGPT subscription using axis bank in this year??
    - how much did I spent for Cursor subscription using axis bank in this year??
    - how much did I spent for Karachi Bakery using axis bank??
