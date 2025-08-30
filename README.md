@@ -93,6 +93,7 @@ http://localhost:8000
 
 1. The chat interface will open with a welcome message
 2. Type your query in natural language, for example:
+   - summarize job opportunity for sai in last one month.
    - how much did I spent on zomato this year??
    - How much did I pay for coursera subscription using axis bank in this year??
    - How much did I spent in Taara Kitchen using axis bank in this month??

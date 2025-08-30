@@ -112,6 +112,7 @@ Your task is to:
    -  Don't Calculate the Total amount leave it as "Total Amount Spent is : TO BE ADDED LATER", I will later replace the "TO BE ADDED LATER" with correct total amount.
 8. If any other user query Answer the question based on the email snippets, focusing specifically on what was asked.
 9. If there are no relevant emails, respond with "No relevant information found in the emails."
+10. If the query says summarize then summarize each email briefly in one or two sentences.
 EMAIL SNIPPETS:
 {combined_emails}
 
