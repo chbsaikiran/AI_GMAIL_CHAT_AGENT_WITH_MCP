@@ -79,54 +79,98 @@ def get_gmail_profile():
     else:
         raise Exception(f"Error fetching profile: {response.text}")
 
-def fetch_emails_from_query(query: str, user_query: str, max_results=50):
-    #output = get_gmail_profile()  # Ensure authentication and get profile
+def get_subject_and_snippet(message):
+    headers = message["payload"]["headers"]
+    subject = next((h["value"] for h in headers if h["name"] == "Subject"), "")
+    snippet = message.get("snippet", "")
+    return subject.lower(), snippet.lower()
+
+def is_promotional(subject, snippet):
+    PROMO_REGEX = re.compile(
+    r"(offer|sale|discount|deal|limited time|hurry|coupon|save|cashback|subscribe|exclusive|get \d+% off)",
+    re.IGNORECASE
+)
+    text = subject + " " + snippet
+    return bool(PROMO_REGEX.search(text))
+
+def fetch_emails_from_query(query: str, user_query: str, max_results=20):
     service = authenticate_gmail()
     print(f"Fetching emails with query: {query}")
-    
+
     try:
+        # Initial request
         results = service.users().messages().list(
-            userId="me", q=query, maxResults=max_results
+            userId="me", q=query, maxResults=1
         ).execute()
+
         messages = results.get("messages", [])
+        next_page_token = results.get("nextPageToken")
 
-        snippets = []
-        for msg in messages:
-            msg_data = service.users().messages().get(userId="me", id=msg["id"], format="full").execute()
-            
-            headers = {h['name']: h['value'] for h in msg_data.get('payload', {}).get('headers', [])}
-            date = headers.get('Date', '')
-            subject = headers.get('Subject', '')
+        collected_snippets = []
+        total_checked = 0
+        total_nonpromo = 0
 
-            # Extract the full email body (plain text or HTML)
-            body = ""
-            payload = msg_data.get("payload", {})
-            
-            if "parts" in payload:
-                for part in payload["parts"]:
-                    if part["mimeType"] in ["text/plain", "text/html"]:
-                        data = part["body"].get("data")
-                        if data:
-                            body += base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
+        while messages and total_nonpromo < max_results:
+            for msg in messages:
+                total_checked += 1
+
+                # Fetch full message
+                msg_data = service.users().messages().get(
+                    userId="me", id=msg["id"], format="full"
+                ).execute()
+
+                headers = {h['name']: h['value'] for h in msg_data.get('payload', {}).get('headers', [])}
+                date = headers.get('Date', '')
+                subject = headers.get('Subject', '')
+                snippet_preview = msg_data.get("snippet", "")
+
+                # Check promotion filter
+                if is_promotional(subject, snippet_preview):
+                    print(f"[{total_checked}] Skipping promotional mail: {subject}")
+                    continue
+
+                total_nonpromo += 1
+                print(f"[{total_checked}] Keeping genuine mail: {subject}")
+
+                # Extract email body
+                body = ""
+                payload = msg_data.get("payload", {})
+                if "parts" in payload:
+                    for part in payload["parts"]:
+                        if part["mimeType"] in ["text/plain", "text/html"]:
+                            data = part["body"].get("data")
+                            if data:
+                                body += base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
+                else:
+                    data = payload.get("body", {}).get("data")
+                    if data:
+                        body += base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
+
+                # Extract structured details from email body
+                details = get_details_from_email_body(body, user_query)
+
+                full_snippet = (
+                    f"Date: {date}\n"
+                    f"Subject: {subject}\n"
+                    f"Details: {details}\n"
+                )
+                collected_snippets.append(full_snippet)
+
+                if total_checked >= max_results:
+                    break
+
+            # Get next page if available
+            if total_checked < max_results and next_page_token:
+                results = service.users().messages().list(
+                    userId="me", q=query, maxResults=1, pageToken=next_page_token
+                ).execute()
+                messages = results.get("messages", [])
+                next_page_token = results.get("nextPageToken")
             else:
-                data = payload.get("body", {}).get("data")
-                if data:
-                    body += base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
+                break
 
-            # Regex to find amounts like ₹123, Rs. 456, $789.00 etc.
-            #amounts = re.findall(r'(?:₹|Rs\.?|INR|USD|\$)\s?\d+(?:,\d{3})*(?:\.\d{1,2})?', body, re.IGNORECASE)
-            details = get_details_from_email_body(body,user_query)
-
-            snippet = details
-            full_snippet = (
-                f"Date: {date}\n"
-                f"Subject: {subject}\n"
-                f"Snippet: {snippet}\n"
-            )
-            snippets.append(full_snippet)
-
-        print(f"Fetched {snippets} emails for query: {query}")
-        return snippets
+        print(f"✅ Processed {total_checked} emails, kept {total_nonpromo} genuine ones.")
+        return collected_snippets
 
     except Exception as e:
         print(f"Error fetching emails: {str(e)}")

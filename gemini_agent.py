@@ -36,54 +36,49 @@ Examples to identify main keywords
 if user asks "Zomato orders this year" main keyword is "Zomato"
 if user asks "IRCTC last week" main keyword is "IRCTC"
 if user asks "where did I travel using Redbus in last one month" main keyword is "Redbus"
-if user asks "OTP from SBI yesterday" main keyword is "SBI"
+if user asks "OTP from SBI yesterday" main keyword is "OTP" and SBI"
 if user asks "which books did I buy on amazon this year??" main keywords are "books" , "amazon"
 if user asks "when did I buy Atomic Habits by James Clear on Amazon" main keywords are "Atomic Habits", "James Clear" , "Amazon"
 if user asks "when did I buy iphone 13 on Croma this year??" main keywords are "iphone 13" "Croma"
 if user asks "when did I buy Samsung Mobile on Flipkart" main keywords are "Samsung" "Flipkart"
-So multiple main keywords can be there in the User Query search query and find all the main keywords and put them in quotes and return it as output query, if there any additional keywords to be added based on the rules below add them too
+So multiple main keywords can be there in the User Query search query and find all the main keywords and put them in quotes and return it as output query
 
 IMPORTANT RULES:
 1. Include the all days in date ranges
 2. Never skip any days in the range
 3. You have pick the keywords from the User Query and do spelling corrections, identify all the main keywords and put them in quotes and return it as output query
-4. If the query is about zomato or swiggy or any food delivery platform, include only the additional keywords "order" and "paid" and nothing else in the output query
-5. If the query is about travel or bookings, include only the additional keyword "Rs", "ticket" or "booking" in the output query
-6. If the query about shopping or orders from online shopping platforms like Amazon, Flipkart, etc, include only the additional keywords "Rs" and "paid" in the output query
-7. If the query is about OTP or transactions from banks, include the additional keyword "OTP"
-8. If the user query not related to online shopping platforms or food delivery platform then don't add any additional keywords like "Rs", "paid", "order", "ticket", "booking" etc. This is most important rule don't add any additional keywords in such cases
-9. Always use after: and before: for date ranges
-10. only include INR currency transactions only, don't include any other currency transactions. This is most important rule
+4. Always use after: and before: for date ranges
+5. only include INR currency transactions only, don't include any other currency transactions. This is most important rule
 
 Examples:
 if user asks "Zomato orders this year" return:
-'"Zomato" order paid after:{year}/01/01 and before:{today}'
+'"Zomato" after:{year}/01/01 and before:{today}'
 
 if user asks "IRCTC last week" return:
-'"IRCTC" Rs ticket booking after:{last_week} and before:{today}'
+'"IRCTC" after:{last_week} and before:{today}'
 
 if user asks "where did I travel using Redbus in last one month" return:
-'"Redbus" Rs ticket booking after:{last_month} and before:{today}'
+'"Redbus" booking after:{last_month} and before:{today}'
 
 if user asks "OTP from SBI yesterday" return:
-'OTP "SBI" after:{yesterday} and before:{today}'
+'"OTP" "SBI" after:{yesterday} and before:{today}'
 
 example with two keywords in User Query "which books did I buy on amazon this year??" return:
-'"books" "amazon" Rs paid after:{year}/01/01 and before:{today}'
+'"books" "amazon" after:{year}/01/01 and before:{today}'
 
 For queries where the date is not mentioned search the mails for last 10 years i.e. if user asks "when did I buy Atomic Habits by James Clear on Amazon" return:
 '"Atomic Habits", "James Clear" "Amazon" after:{last_ten_years} and before:{today}'
 
-Below are examples of how to handle specific user queries(this is example of not adding additional keywords because it is not about shopping or food or travel):
+Below are examples of how to handle specific user queries:
 when did I buy iphone 13 on Croma this year?? return:
 '"iphone 13" "Croma" after:{year}/01/01 and before:{today}'
 
-How much did I pay for coursera subscription using axis bank in this year??(this is example of not adding additional keywords because it is not about shopping or food or travel): return:
+How much did I pay for coursera subscription using axis bank in this year??: return:
 '"coursera" "axis bank" after:{year}/01/01 and before:{today}'
 
-For queries where the date is not mentioned search the mails for last 10 years(this is example of not adding additional keywords because it is specific query with when and where)
+For queries where the date is not mentioned search the mails for last 10 years
  i.e. if user asks "when did I buy Samsung Mobile on Flipkart" return:
-'"Samsung" "Flipkart" Rs paid after:{last_ten_years} and before:{today}'
+'"Samsung" "Flipkart" after:{last_ten_years} and before:{today}'
 
 User Query:
 {natural_question}
