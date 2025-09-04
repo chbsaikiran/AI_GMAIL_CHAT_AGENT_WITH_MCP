@@ -6,9 +6,16 @@ from datetime import datetime, timedelta
 import requests
 import base64
 import re
+import asyncio
+import websockets
 
 import google.generativeai as genai
 from dotenv import load_dotenv
+
+import json
+import requests
+
+url = 'http://127.0.0.1:8005/model'
 
 # Load environment variables from .env file
 load_dotenv()
@@ -23,30 +30,6 @@ SCOPES = [
     "https://www.googleapis.com/auth/userinfo.profile",
     "https://www.googleapis.com/auth/contacts.readonly"
 ]
-def get_details_from_email_body(email_body,user_query):
-    model = genai.GenerativeModel("gemini-2.0-flash")
-    final_prompt = f"""Your task is to extract the following details from the email body based on the user's query:
-    {user_query}
-1. Amounts: Look for monetary amounts in various formats (e.g., ₹123,
-    Rs. 456, $789.00, etc.) and list them.
-2. Dates: Identify any dates mentioned in the email body in various formats
-    (e.g., DD/MM/YYYY, MM-DD-YYYY, Month Day, Year, etc.) and list them.
-3. Keywords: Extract keywords related to expenses, orders, transactions,
-    bookings, payments, refunds, cancellation etc. List all relevant keywords found in the email body.
-4. Summary: Provide a brief summary of the email content in one or two sentences. and definetely include the of from where to where the journey happened in case of travel bookings
-5. If the amounts in not in float or integer format then ignore that amount
-6. If no details found then return None for that field
-Only provide the extracted information in a structured format as shown below.
-If any of the details are not found, indicate "None" for that field.
-Format:
-Amounts: [list of amounts or "None"]
-Dates: [list of dates or "None"]
-Keywords: [list of keywords or "None"]
-Summary: [brief summary or "None"]
-Email Body: {email_body}
-Extracted Details:"""
-    response = model.generate_content(final_prompt)
-    return response.text.strip().strip('"')
 
 def authenticate_gmail():
     creds = None
@@ -93,86 +76,94 @@ def is_promotional(subject, snippet):
     text = subject + " " + snippet
     return bool(PROMO_REGEX.search(text))
 
-def fetch_emails_from_query(query: str, user_query: str, max_results=20):
-    service = authenticate_gmail()
-    print(f"Fetching emails with query: {query}")
+async def fetch_emails_from_query(max_results=20):
+    async with websockets.connect("ws://ec2-13-126-198-84.ap-south-1.compute.amazonaws.com:8765/ws",ping_timeout=None) as websocket:
+        await websocket.send("how much did I spent on zomato this year")
+        query = await websocket.recv()
+        print("Server:", query)
 
-    try:
-        # Initial request
-        results = service.users().messages().list(
-            userId="me", q=query, maxResults=1
-        ).execute()
+        # Send message to server
+        #await websocket.send("Hello from client!")
+        service = authenticate_gmail()
+        print(f"Fetching emails with query: {query}")
 
-        messages = results.get("messages", [])
-        next_page_token = results.get("nextPageToken")
+        try:
+            # Initial request
+            results = service.users().messages().list(
+                userId="me", q=query, maxResults=1
+            ).execute()
 
-        collected_snippets = []
-        total_checked = 0
-        total_nonpromo = 0
+            messages = results.get("messages", [])
+            next_page_token = results.get("nextPageToken")
 
-        while messages and total_nonpromo < max_results:
-            for msg in messages:
-                total_checked += 1
+            collected_snippets = []
+            total_checked = 0
+            total_nonpromo = 0
 
-                # Fetch full message
-                msg_data = service.users().messages().get(
-                    userId="me", id=msg["id"], format="full"
-                ).execute()
+            while messages and total_nonpromo < max_results:
+                for msg in messages:
+                    total_checked += 1
 
-                headers = {h['name']: h['value'] for h in msg_data.get('payload', {}).get('headers', [])}
-                date = headers.get('Date', '')
-                subject = headers.get('Subject', '')
-                snippet_preview = msg_data.get("snippet", "")
+                    # Fetch full message
+                    msg_data = service.users().messages().get(
+                        userId="me", id=msg["id"], format="full"
+                    ).execute()
 
-                # Check promotion filter
-                if is_promotional(subject, snippet_preview):
-                    print(f"[{total_checked}] Skipping promotional mail: {subject}")
-                    continue
+                    headers = {h['name']: h['value'] for h in msg_data.get('payload', {}).get('headers', [])}
+                    date = headers.get('Date', '')
+                    subject = headers.get('Subject', '')
+                    snippet_preview = msg_data.get("snippet", "")
 
-                total_nonpromo += 1
-                print(f"[{total_checked}] Keeping genuine mail: {subject}")
+                    # Check promotion filter
+                    if is_promotional(subject, snippet_preview):
+                        print(f"[{total_checked}] Skipping promotional mail: {subject}")
+                        continue
 
-                # Extract email body
-                body = ""
-                payload = msg_data.get("payload", {})
-                if "parts" in payload:
-                    for part in payload["parts"]:
-                        if part["mimeType"] in ["text/plain", "text/html"]:
-                            data = part["body"].get("data")
-                            if data:
-                                body += base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
+                    total_nonpromo += 1
+                    print(f"[{total_checked}] Keeping genuine mail: {subject}")
+
+                    # Extract email body
+                    body = ""
+                    payload = msg_data.get("payload", {})
+                    if "parts" in payload:
+                        for part in payload["parts"]:
+                            if part["mimeType"] in ["text/plain", "text/html"]:
+                                data = part["body"].get("data")
+                                if data:
+                                    body += base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
+                    else:
+                        data = payload.get("body", {}).get("data")
+                        if data:
+                            body += base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
+
+                    # Extract structured details from email body
+                    await websocket.send(date)
+                    await websocket.send(subject)
+                    await websocket.send(body)
+                    #details = get_details_from_email_body(body, user_query)
+
+                    if total_checked >= max_results:
+                        break
+
+                # Get next page if available
+                if total_checked < max_results and next_page_token:
+                    results = service.users().messages().list(
+                        userId="me", q=query, maxResults=1, pageToken=next_page_token
+                    ).execute()
+                    messages = results.get("messages", [])
+                    next_page_token = results.get("nextPageToken")
                 else:
-                    data = payload.get("body", {}).get("data")
-                    if data:
-                        body += base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
-
-                # Extract structured details from email body
-                details = get_details_from_email_body(body, user_query)
-
-                full_snippet = (
-                    f"Date: {date}\n"
-                    f"Subject: {subject}\n"
-                    f"Details: {details}\n"
-                )
-                collected_snippets.append(full_snippet)
-
-                if total_checked >= max_results:
                     break
 
-            # Get next page if available
-            if total_checked < max_results and next_page_token:
-                results = service.users().messages().list(
-                    userId="me", q=query, maxResults=1, pageToken=next_page_token
-                ).execute()
-                messages = results.get("messages", [])
-                next_page_token = results.get("nextPageToken")
-            else:
-                break
+            print(f"✅ Processed {total_checked} emails, kept {total_nonpromo} genuine ones.")
+            #print(collected_snippets)
+            await websocket.send("Done")
+            #await websocket.send(collected_snippets)
+            answer = await websocket.recv()
+            print("Server:", answer)
 
-        print(f"✅ Processed {total_checked} emails, kept {total_nonpromo} genuine ones.")
-        #print(collected_snippets)
-        return collected_snippets
-
-    except Exception as e:
-        print(f"Error fetching emails: {str(e)}")
+        except Exception as e:
+            print(f"Error fetching emails: {str(e)}")
         return []
+    
+asyncio.run(fetch_emails_from_query())

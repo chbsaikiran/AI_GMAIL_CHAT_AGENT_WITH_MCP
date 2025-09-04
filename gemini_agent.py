@@ -11,6 +11,31 @@ api_key = os.getenv("GEMINI_API_KEY")
 #client = genai.Client(api_key=api_key)
 genai.configure(api_key=api_key)
 
+def get_details_from_email_body(email_body,user_query):
+    model = genai.GenerativeModel("gemini-2.0-flash")
+    final_prompt = f"""Your task is to extract the following details from the email body based on the user's query:
+    {user_query}
+1. Amounts: Look for monetary amounts in various formats (e.g., ₹123,
+    Rs. 456, $789.00, etc.) and list them.
+2. Dates: Identify any dates mentioned in the email body in various formats
+    (e.g., DD/MM/YYYY, MM-DD-YYYY, Month Day, Year, etc.) and list them.
+3. Keywords: Extract keywords related to expenses, orders, transactions,
+    bookings, payments, refunds, cancellation etc. List all relevant keywords found in the email body.
+4. Summary: Provide a brief summary of the email content in one or two sentences. and definetely include the of from where to where the journey happened in case of travel bookings
+5. If the amounts in not in float or integer format then ignore that amount
+6. If no details found then return None for that field
+Only provide the extracted information in a structured format as shown below.
+If any of the details are not found, indicate "None" for that field.
+Format:
+Amounts: [list of amounts or "None"]
+Dates: [list of dates or "None"]
+Keywords: [list of keywords or "None"]
+Summary: [brief summary or "None"]
+Email Body: {email_body}
+Extracted Details:"""
+    response = model.generate_content(final_prompt)
+    return response.text.strip().strip('"')
+
 def build_gmail_search_query(natural_question: str) -> str:
     today = date.today()
     year = today.year
@@ -52,13 +77,13 @@ IMPORTANT RULES:
 
 Examples:
 if user asks "Zomato orders this year" return:
-'"Zomato" after:{year}/01/01 and before:{today}'
+'"Zomato" INR after:{year}/01/01 and before:{today}'
 
 if user asks "IRCTC last week" return:
-'"IRCTC" after:{last_week} and before:{today}'
+'"IRCTC" INR after:{last_week} and before:{today}'
 
 if user asks "where did I travel using Redbus in last one month" return:
-'"Redbus" booking after:{last_month} and before:{today}'
+'"Redbus" INR booking after:{last_month} and before:{today}'
 
 if user asks "OTP from SBI yesterday" return:
 '"OTP" "SBI" after:{yesterday} and before:{today}'

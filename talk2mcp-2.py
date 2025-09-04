@@ -7,13 +7,11 @@ import google.generativeai as genai
 from concurrent.futures import TimeoutError
 from functools import partial
 
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+
 from pydantic import BaseModel
-from gmail_utils import fetch_emails_from_query
-from gemini_agent import build_gmail_search_query, summarize_emails_with_query,get_total_expenses_from_emails_with_query,Replace_total_expenses_from_emails_with_query
+#from gmail_utils import fetch_emails_from_query
+from gemini_agent import get_details_from_email_body,build_gmail_search_query, summarize_emails_with_query,get_total_expenses_from_emails_with_query,Replace_total_expenses_from_emails_with_query
 
 import os
 from google.oauth2.credentials import Credentials
@@ -68,160 +66,176 @@ def reset_state():
 
 app = FastAPI()
 
-# Mount static files
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# Templates
-templates = Jinja2Templates(directory="templates")
-
-class UserQuery(BaseModel):
-    query: str
-
-@app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
-
-@app.post("/chat_with_gmail")
-async def chat_with_gmail(user_input: UserQuery):
-    gmail_query = build_gmail_search_query(user_input.query)
-    snippets = fetch_emails_from_query(gmail_query,user_input.query)
-    summarized_email = summarize_emails_with_query(user_input.query, snippets)
-    list_of_numbers = get_total_expenses_from_emails_with_query(summarized_email)
-    reset_state()  # Reset at the start of main
-    print("Starting main execution...")
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
     try:
-        # Create a single MCP server connection
-        print("Establishing connection to MCP server...")
-        server_params = StdioServerParameters(
-            command="python",
-            args=["example2.py"]
-        )
+        while True:
+            # Receive a message from client
+            query = await websocket.receive_text()
+            print(f"Client says: {query}")
+            gmail_query = build_gmail_search_query(query)
 
-        async with stdio_client(server_params) as (read, write):
-            print("Connection established, creating session...")
-            async with ClientSession(read, write) as session:
-                print("Session created, initializing...")
-                await session.initialize()
-                
-                # Get available tools
-                print("Requesting tool list...")
-                tools_result = await session.list_tools()
-                tools = tools_result.tools
-                print(f"Successfully retrieved {len(tools)} tools")
+            # Respond back to client
+            await websocket.send_text(gmail_query)
+            collected_snippets = []
+            while True:
+                date = await websocket.receive_text()
+                if date == "Done":
+                    break
+                subject = await websocket.receive_text()
+                body = await websocket.receive_text()
+                details = get_details_from_email_body(body, query)
+                full_snippet = (
+                        f"Date: {date}\n"
+                        f"Subject: {subject}\n"
+                        f"Details: {details}\n"
+                    )
+                collected_snippets.append(full_snippet)
+            print(f"Received snippets: {collected_snippets}")
+            summarized_email = summarize_emails_with_query(query, collected_snippets)
+            list_of_numbers = get_total_expenses_from_emails_with_query(summarized_email)
+            reset_state()  # Reset at the start of main
+            print("Starting main execution...")
+            try:
+                # Create a single MCP server connection
+                print("Establishing connection to MCP server...")
+                server_params = StdioServerParameters(
+                    command="python",
+                    args=["example2.py"]
+                )
 
-                # Create system prompt with available tools
-                print("Creating system prompt...")
-                print(f"Number of tools: {len(tools)}")
-                
-                try:
-                    # First, let's inspect what a tool object looks like
-                    # if tools:
-                    #     print(f"First tool properties: {dir(tools[0])}")
-                    #     print(f"First tool example: {tools[0]}")
-                    
-                    tools_description = []
-                    for i, tool in enumerate(tools):
+                async with stdio_client(server_params) as (read, write):
+                    print("Connection established, creating session...")
+                    async with ClientSession(read, write) as session:
+                        print("Session created, initializing...")
+                        await session.initialize()
+                        
+                        # Get available tools
+                        print("Requesting tool list...")
+                        tools_result = await session.list_tools()
+                        tools = tools_result.tools
+                        print(f"Successfully retrieved {len(tools)} tools")
+
+                        # Create system prompt with available tools
+                        print("Creating system prompt...")
+                        print(f"Number of tools: {len(tools)}")
+                        
                         try:
-                            # Get tool properties
-                            params = tool.inputSchema
-                            desc = getattr(tool, 'description', 'No description available')
-                            name = getattr(tool, 'name', f'tool_{i}')
+                            # First, let's inspect what a tool object looks like
+                            # if tools:
+                            #     print(f"First tool properties: {dir(tools[0])}")
+                            #     print(f"First tool example: {tools[0]}")
                             
-                            # Format the input schema in a more readable way
-                            if 'properties' in params:
-                                param_details = []
-                                for param_name, param_info in params['properties'].items():
-                                    param_type = param_info.get('type', 'unknown')
-                                    param_details.append(f"{param_name}: {param_type}")
-                                params_str = ', '.join(param_details)
-                            else:
-                                params_str = 'no parameters'
+                            tools_description = []
+                            for i, tool in enumerate(tools):
+                                try:
+                                    # Get tool properties
+                                    params = tool.inputSchema
+                                    desc = getattr(tool, 'description', 'No description available')
+                                    name = getattr(tool, 'name', f'tool_{i}')
+                                    
+                                    # Format the input schema in a more readable way
+                                    if 'properties' in params:
+                                        param_details = []
+                                        for param_name, param_info in params['properties'].items():
+                                            param_type = param_info.get('type', 'unknown')
+                                            param_details.append(f"{param_name}: {param_type}")
+                                        params_str = ', '.join(param_details)
+                                    else:
+                                        params_str = 'no parameters'
 
-                            tool_desc = f"{i+1}. {name}({params_str}) - {desc}"
-                            tools_description.append(tool_desc)
-                            print(f"Added description for tool: {tool_desc}")
+                                    tool_desc = f"{i+1}. {name}({params_str}) - {desc}"
+                                    tools_description.append(tool_desc)
+                                    print(f"Added description for tool: {tool_desc}")
+                                except Exception as e:
+                                    print(f"Error processing tool {i}: {e}")
+                                    tools_description.append(f"{i+1}. Error processing tool")
+                            
+                            tools_description = "\n".join(tools_description)
+                            print("Successfully created tools description")
                         except Exception as e:
-                            print(f"Error processing tool {i}: {e}")
-                            tools_description.append(f"{i+1}. Error processing tool")
-                    
-                    tools_description = "\n".join(tools_description)
-                    print("Successfully created tools description")
-                except Exception as e:
-                    print(f"Error creating tools description: {e}")
-                    tools_description = "Error loading tools"
-                
-                print("Created system prompt... ")
-                print(list_of_numbers)
+                            print(f"Error creating tools description: {e}")
+                            tools_description = "Error loading tools"
+                        
+                        print("Created system prompt... ")
+                        print(list_of_numbers)
 
-                _, function_info = list_of_numbers.split(":", 1)
-                parts = [p.strip() for p in function_info.split("|")]
-                func_name, params = parts[0], parts[1:]
-                print(f"\nDEBUG: Raw function info: {function_info}")
-                print(f"DEBUG: Split parts: {parts}")
-                print(f"DEBUG: Function name: {func_name}")
-                print(f"DEBUG: Raw parameters: {params}")
-                
-                if func_name == "add_list" and params == ['0']:
-                    print("No expenses found in the summary.")
-                    summarized_email = Replace_total_expenses_from_emails_with_query(summarized_email,"No relevant information found in the emails.")
-                    return {"answer": summarized_email}
-                try:
-                    # Find the matching tool to get its input schema
-                    tool = next((t for t in tools if t.name == func_name), None)
-                    if not tool:
-                        print(f"DEBUG: Available tools: {[t.name for t in tools]}")
-                        raise ValueError(f"Unknown tool: {func_name}")
+                        _, function_info = list_of_numbers.split(":", 1)
+                        parts = [p.strip() for p in function_info.split("|")]
+                        func_name, params = parts[0], parts[1:]
+                        print(f"\nDEBUG: Raw function info: {function_info}")
+                        print(f"DEBUG: Split parts: {parts}")
+                        print(f"DEBUG: Function name: {func_name}")
+                        print(f"DEBUG: Raw parameters: {params}")
+                        
+                        if func_name == "add_list" and params == ['0']:
+                            print("No expenses found in the summary.")
+                            summarized_email = Replace_total_expenses_from_emails_with_query(summarized_email,"No relevant information found in the emails.")
+                            return {"answer": summarized_email}
+                        try:
+                            # Find the matching tool to get its input schema
+                            tool = next((t for t in tools if t.name == func_name), None)
+                            if not tool:
+                                print(f"DEBUG: Available tools: {[t.name for t in tools]}")
+                                raise ValueError(f"Unknown tool: {func_name}")
 
-                    print(f"DEBUG: Found tool: {tool.name}")
-                    print(f"DEBUG: Tool schema: {tool.inputSchema}")
+                            print(f"DEBUG: Found tool: {tool.name}")
+                            print(f"DEBUG: Tool schema: {tool.inputSchema}")
 
-                    # Prepare arguments according to the tool's input schema
-                    arguments = {}
-                    schema_properties = tool.inputSchema.get('properties', {})
-                    print(f"DEBUG: Schema properties: {schema_properties}")
+                            # Prepare arguments according to the tool's input schema
+                            arguments = {}
+                            schema_properties = tool.inputSchema.get('properties', {})
+                            print(f"DEBUG: Schema properties: {schema_properties}")
 
-                    for param_name, param_info in schema_properties.items():
-                        if not params:  # Check if we have enough parameters
-                            raise ValueError(f"Not enough parameters provided for {func_name}")
+                            for param_name, param_info in schema_properties.items():
+                                if not params:  # Check if we have enough parameters
+                                    raise ValueError(f"Not enough parameters provided for {func_name}")
+                                    
+                                value = params  # Get and remove the first parameter
+                                param_type = param_info.get('type', 'string')
+                                
+                                print(f"DEBUG: Converting parameter {param_name} with value {value} to type {param_type}")
+                                
+                                # Convert the value to the correct type based on the schema
+                                if param_type == 'integer':
+                                    arguments[param_name] = int(value)
+                                elif param_type == 'number':
+                                    arguments[param_name] = float(value)
+                                elif param_type == 'array':
+                                    # Handle array input
+                                    if isinstance(value, str):
+                                        value = value.strip('[]').split(',')
+                                    arguments[param_name] = [float(x.strip()) for x in value]
+                                else:
+                                    arguments[param_name] = str(value)
+
+                            print(f"DEBUG: Final arguments: {arguments}")
+                            print(f"DEBUG: Calling tool {func_name}")
                             
-                        value = params  # Get and remove the first parameter
-                        param_type = param_info.get('type', 'string')
-                        
-                        print(f"DEBUG: Converting parameter {param_name} with value {value} to type {param_type}")
-                        
-                        # Convert the value to the correct type based on the schema
-                        if param_type == 'integer':
-                            arguments[param_name] = int(value)
-                        elif param_type == 'number':
-                            arguments[param_name] = float(value)
-                        elif param_type == 'array':
-                            # Handle array input
-                            if isinstance(value, str):
-                                value = value.strip('[]').split(',')
-                            arguments[param_name] = [float(x.strip()) for x in value]
-                        else:
-                            arguments[param_name] = str(value)
+                            result = await session.call_tool(func_name, arguments=arguments)
+                            print(f"DEBUG: Raw result: {result.content[0].text}")
+                            summarized_email = Replace_total_expenses_from_emails_with_query(summarized_email,result.content[0].text)
+                            await websocket.send_text(summarized_email)
 
-                    print(f"DEBUG: Final arguments: {arguments}")
-                    print(f"DEBUG: Calling tool {func_name}")
-                    
-                    result = await session.call_tool(func_name, arguments=arguments)
-                    print(f"DEBUG: Raw result: {result.content[0].text}")
-                    summarized_email = Replace_total_expenses_from_emails_with_query(summarized_email,result.content[0].text)
+                        except Exception as e:
+                            print(f"DEBUG: Error details: {str(e)}")
+                            print(f"DEBUG: Error type: {type(e)}")
+                            import traceback
+                            traceback.print_exc()
+                            iteration_response.append(f"Error in iteration {iteration + 1}: {str(e)}")
 
-                except Exception as e:
-                    print(f"DEBUG: Error details: {str(e)}")
-                    print(f"DEBUG: Error type: {type(e)}")
-                    import traceback
-                    traceback.print_exc()
-                    iteration_response.append(f"Error in iteration {iteration + 1}: {str(e)}")
+            except Exception as e:
+                print(f"Error in main execution: {e}")
+                import traceback
+                traceback.print_exc()
+            finally:
+                reset_state()  # Reset at the end of main
 
-    except Exception as e:
-        print(f"Error in main execution: {e}")
-        import traceback
-        traceback.print_exc()
-    finally:
-        reset_state()  # Reset at the end of main
+    except WebSocketDisconnect:
+        print("Client disconnected")
+
+    
     return {"answer": summarized_email}
 
 def main():
