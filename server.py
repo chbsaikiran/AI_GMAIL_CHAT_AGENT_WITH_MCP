@@ -18,6 +18,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from datetime import datetime, timedelta
+import websockets
 
 SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 
@@ -64,12 +65,24 @@ def reset_state():
     iteration = 0
     iteration_response = []
 
+async def handler(websocket):
+    while True:
+        await websocket.send("ping")
+        await asyncio.sleep(30)  # send ping every 30s
+
+async def keep_alive():
+    async with websockets.serve(handler, "localhost", 8765, ping_interval=20, ping_timeout=10):
+        await asyncio.Future()  # run forever
+
 app = FastAPI()
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
+    timeout = 1
     try:
+        await asyncio.sleep(timeout)  # keep the connection alive
+        timeout = 30  # increase timeout after first successful connection
         while True:
             # Receive a message from client
             query = await websocket.receive_text()
@@ -217,14 +230,13 @@ async def websocket_endpoint(websocket: WebSocket):
                             print(f"DEBUG: Raw result: {result.content[0].text}")
                             summarized_email = Replace_total_expenses_from_emails_with_query(summarized_email,result.content[0].text)
                             await websocket.send_text(summarized_email)
-
+                    
                         except Exception as e:
                             print(f"DEBUG: Error details: {str(e)}")
                             print(f"DEBUG: Error type: {type(e)}")
                             import traceback
                             traceback.print_exc()
                             iteration_response.append(f"Error in iteration {iteration + 1}: {str(e)}")
-
             except Exception as e:
                 print(f"Error in main execution: {e}")
                 import traceback

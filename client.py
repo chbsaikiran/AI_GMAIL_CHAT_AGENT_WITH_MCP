@@ -14,6 +14,11 @@ from dotenv import load_dotenv
 
 import json
 import requests
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 
 url = 'http://127.0.0.1:8005/model'
 
@@ -76,11 +81,29 @@ def is_promotional(subject, snippet):
     text = subject + " " + snippet
     return bool(PROMO_REGEX.search(text))
 
-async def fetch_emails_from_query(max_results=20):
-    async with websockets.connect("ws://ec2-13-126-198-84.ap-south-1.compute.amazonaws.com:8765/ws",ping_timeout=None) as websocket:
-        await websocket.send("how much did I spent on zomato this year")
+app = FastAPI()
+
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Templates
+templates = Jinja2Templates(directory="templates")
+
+class UserQuery(BaseModel):
+    query: str
+
+@app.get("/", response_class=HTMLResponse)
+async def read_root(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+@app.post("/chat_with_gmail")
+async def chat_with_gmail(user_input: UserQuery):
+    summarized_email = ""
+    async with websockets.connect("ws://127.0.0.1:8000/ws", ping_interval=20, ping_timeout=20) as websocket:
+        await websocket.send(user_input.query)
         query = await websocket.recv()
         print("Server:", query)
+        max_results = 20  # Limit to check only 20 emails
 
         # Send message to server
         #await websocket.send("Hello from client!")
@@ -159,11 +182,17 @@ async def fetch_emails_from_query(max_results=20):
             #print(collected_snippets)
             await websocket.send("Done")
             #await websocket.send(collected_snippets)
-            answer = await websocket.recv()
-            print("Server:", answer)
+            summarized_email = await websocket.recv()
+            print("Server:", summarized_email)
 
         except Exception as e:
             print(f"Error fetching emails: {str(e)}")
-        return []
-    
-asyncio.run(fetch_emails_from_query())
+    return {"answer": summarized_email}
+
+def main():
+    """Main function to run the FastAPI app"""
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=5000)
+
+if __name__ == "__main__":
+    asyncio.run(main())
